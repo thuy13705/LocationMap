@@ -10,6 +10,7 @@ import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -30,10 +31,13 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.util.Locale;
+
 import hcmus.student.locationmap.MainActivity;
 import hcmus.student.locationmap.R;
 import hcmus.student.locationmap.map.custom_view.MapWrapper;
 import hcmus.student.locationmap.map.custom_view.OnMapWrapperTouch;
+import hcmus.student.locationmap.map.utilities.SpeedMonitor;
 import hcmus.student.locationmap.utilities.LocationChangeCallback;
 
 public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback {
@@ -53,8 +57,11 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     private MarkerAnimator animator;
     private boolean isCameraFollowing;
     private boolean isContactShown;
+    private SpeedMonitor speedMonitor;
     private FloatingActionButton btnLocation;
-    private FloatingActionButton btnContact;
+    private TextView txtSpeed;
+    private Handler velocityHandler;
+    private Runnable velocityRunnable;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MapsFragment newInstance() {
@@ -70,6 +77,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         context = getContext();
         main = (MainActivity) getActivity();
         isCameraFollowing = true;
+
+        velocityHandler = new Handler();
+        velocityRunnable = null;
+        speedMonitor = new SpeedMonitor(context);
     }
 
     @Nullable
@@ -79,6 +90,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
                              @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_maps, container, false);
         mMapView = view.findViewById(R.id.map);
+        txtSpeed = view.findViewById(R.id.txtSpeed);
+
         mMapView.onCreate(savedInstanceState);
         main.registerLocationChange(this);
         mMapView.getMapAsync(this);
@@ -90,7 +103,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         mMap = googleMap;
 
         btnLocation = getView().findViewById(R.id.btnLocation);
-        btnContact = getView().findViewById(R.id.btnContact);
         final MapWrapper mapContainer = getView().findViewById(R.id.mapContainer);
 
         mapContainer.setOnMapWrapperTouch(new OnMapWrapperTouch() {
@@ -198,6 +210,22 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
                     location.getLongitude()), DEFAULT_ZOOM));
         }
         mCurrentLocation = location;
+        double speed = speedMonitor.getSpeed(mCurrentLocation);
+        if (speed >= 0)
+            txtSpeed.setText(String.format(Locale.US, "%.1f", speed));
+
+        if (velocityRunnable != null) {
+            velocityHandler.removeCallbacks(velocityRunnable);
+        }
+
+        velocityRunnable = new Runnable() {
+            @Override
+            public void run() {
+                txtSpeed.setText("0");
+            }
+        };
+
+        velocityHandler.postDelayed(velocityRunnable, 5000);
         animator.animate(location, isCameraFollowing);
     }
 
