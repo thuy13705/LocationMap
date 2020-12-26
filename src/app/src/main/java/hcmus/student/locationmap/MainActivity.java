@@ -14,13 +14,17 @@ import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 import androidx.viewpager2.widget.ViewPager2;
 
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import hcmus.student.locationmap.map.MarkerInfoFragment;
 import hcmus.student.locationmap.utilities.LocationService;
 import hcmus.student.locationmap.utilities.LocationChangeCallback;
 import hcmus.student.locationmap.utilities.ViewPagerAdapter;
@@ -155,5 +159,21 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
     @Override
     public void registerLocationChange(LocationChangeCallback delegate) {
         delegates.add(delegate);
+    }
+
+    @Override
+    public void backToPreviousFragment() {
+        getSupportFragmentManager().popBackStack();
+    }
+
+    @Override
+    public void openMarkerInfo(Marker marker) {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        //set fragment entrance animation
+        fragmentTransaction.replace(R.id.frameBottom, MarkerInfoFragment.newInstance(marker));
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
+        fragmentTransaction.commit();
     }
 }

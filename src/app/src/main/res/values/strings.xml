@@ -29,4 +29,6 @@
     <string name="txtDeleteConfirm">Bạn có chắc muốn xóa địa chỉ này?</string>
     <string name="txtYes">Có</string>
     <string name="txtNo">Không</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
 </resources>
