@@ -168,6 +168,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
             public boolean onMarkerClick(Marker marker) {
                 if (marker.getPosition().equals(mLocationIndicator.getPosition()))
                     return true;
+                main.openMarkerInfo(marker);
                 mMap.animateCamera(CameraUpdateFactory.newLatLng(marker.getPosition()));
                 return true;
             }

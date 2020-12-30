@@ -2,12 +2,20 @@ package hcmus.student.locationmap.map;
 
 import android.animation.ValueAnimator;
 import android.location.Location;
+import android.os.Bundle;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.LinearInterpolator;
+
+import androidx.fragment.app.Fragment;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
+
+import hcmus.student.locationmap.R;
 
 public class MarkerAnimator {
     private static final long ANIMATION_DURATION = 500;
@@ -53,4 +61,5 @@ public class MarkerAnimator {
         });
         animator.start();
     }
+
 }
