@@ -40,7 +40,8 @@ import hcmus.student.locationmap.map.custom_view.OnMapWrapperTouch;
 import hcmus.student.locationmap.map.utilities.SpeedMonitor;
 import hcmus.student.locationmap.utilities.LocationChangeCallback;
 
-public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback {
+public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback,
+        MapsFragmentCallback {
 
     private static final int DEFAULT_ZOOM = 15;
     private static final int NORMAL_ROUTE_WIDTH = 8;
@@ -245,5 +246,14 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     public void onPause() {
         mMapView.onPause();
         super.onPause();
+    }
+
+    @Override
+    public void openSearchResultMarker(LatLng coordinate) {
+        if (mDefaultMarker != null)
+            mDefaultMarker.remove();
+        mDefaultMarker = mMap.addMarker(new MarkerOptions().position(coordinate));
+        stopFollowing();
+        mMap.animateCamera(CameraUpdateFactory.newLatLng(coordinate));
     }
 }

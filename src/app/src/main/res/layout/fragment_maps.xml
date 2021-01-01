@@ -113,5 +113,11 @@
         android:layout_height="wrap_content"
         android:layout_gravity="top"
         android:clickable="true"
-        android:focusable="true" />
+        android:focusable="true">
+
+        <fragment
+            class="hcmus.student.locationmap.map.search.SearchFragment"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </FrameLayout>
 </FrameLayout>
