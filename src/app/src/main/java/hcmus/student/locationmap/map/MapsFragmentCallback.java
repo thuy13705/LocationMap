@@ -4,4 +4,5 @@ import com.google.android.gms.maps.model.LatLng;
 
 public interface MapsFragmentCallback {
     void openSearchResultMarker(LatLng latLng);
+    void closeDirection();
 }

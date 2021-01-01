@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -25,6 +26,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.material.tabs.TabLayout;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -162,6 +164,15 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
     }
 
     @Override
+    public void onBackPressed() {
+        if (mViewPager.getCurrentItem() == 0 && adapter.getFragment(0).getChildFragmentManager().getBackStackEntryCount() > 0) {
+            ((MapsFragment) adapter.getFragment(0)).closeDirection();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
     public void registerLocationChange(LocationChangeCallback delegate) {
         delegates.add(delegate);
     }
@@ -192,5 +203,10 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
         }
         imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
         fragment.openSearchResultMarker(latLng);
+    }
+
+    public void drawRoute(LatLng start, LatLng end, String mode) {
+        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
+        fragment.drawRoute(start, end, mode);
     }
 }

@@ -18,30 +18,42 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import hcmus.student.locationmap.MainActivity;
 import hcmus.student.locationmap.R;
 import hcmus.student.locationmap.map.custom_view.MapWrapper;
 import hcmus.student.locationmap.map.custom_view.OnMapWrapperTouch;
+import hcmus.student.locationmap.map.direction.DirectionFragment;
 import hcmus.student.locationmap.map.utilities.SpeedMonitor;
+import hcmus.student.locationmap.map.utilities.direction.Direction;
+import hcmus.student.locationmap.map.utilities.direction.DirectionResponse;
+import hcmus.student.locationmap.map.utilities.direction.DirectionTask;
 import hcmus.student.locationmap.utilities.LocationChangeCallback;
 
 public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback,
-        MapsFragmentCallback {
+        MapsFragmentCallback, DirectionResponse {
 
     private static final int DEFAULT_ZOOM = 15;
     private static final int NORMAL_ROUTE_WIDTH = 8;
@@ -63,6 +75,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     private TextView txtSpeed;
     private Handler velocityHandler;
     private Runnable velocityRunnable;
+    private DirectionFragment directionFragment;
+
+    private ArrayList<Polyline> mRoutes;
+    private Marker mRouteStartMarker, mRouteEndMarker;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     public static MapsFragment newInstance() {
@@ -82,6 +98,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         velocityHandler = new Handler();
         velocityRunnable = null;
         speedMonitor = new SpeedMonitor(context);
+
+        mRouteStartMarker = mRouteEndMarker = null;
     }
 
     @Nullable
@@ -186,6 +204,21 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
                 return true;
             }
         });
+
+        mMap.setOnPolylineClickListener(new GoogleMap.OnPolylineClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.O)
+            @Override
+            public void onPolylineClick(Polyline polyline) {
+                for (Polyline route : mRoutes) {
+                    route.setZIndex(0);
+                    route.setWidth(NORMAL_ROUTE_WIDTH);
+                }
+                polyline.setWidth(SELECTED_ROUTE_WIDTH);
+                polyline.setZIndex(1);
+                directionFragment.onDurationChange(polyline.getTag().toString(), polyline.getColor());
+            }
+        });
+
     }
 
     @Override
@@ -255,5 +288,108 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         mDefaultMarker = mMap.addMarker(new MarkerOptions().position(coordinate));
         stopFollowing();
         mMap.animateCamera(CameraUpdateFactory.newLatLng(coordinate));
+    }
+
+    public void drawRoute(LatLng start, LatLng end, String mode) {
+        stopFollowing();
+        LatLng startPos = start == null ? new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()) : start;
+        LatLng endPos = end == null ? new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()) : end;
+        if (directionFragment == null)
+            showDirectionFragment(null, endPos);
+        else {
+            try {
+                directionFragment.onRouteChange(start, end);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        String url = Direction.getDirectionUrl(startPos, endPos, mode, main);
+        new DirectionTask(this).execute(url);
+    }
+
+    @Override
+    public void onRouteRespond
+            (List<PolylineOptions> polylineOptions, List<String> durations) {
+        if (mRoutes != null) {
+            for (int i = 0; i < mRoutes.size(); i++) {
+                mRoutes.get(i).remove();
+            }
+        }
+
+        if (polylineOptions == null || polylineOptions.size() == 0) {
+            Toast.makeText(context, "Cannot find direction to this location", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        mRoutes = new ArrayList<>();
+
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        for (int i = 0; i < polylineOptions.size(); i++) {
+            PolylineOptions route = polylineOptions.get(i);
+            Polyline polyline = mMap.addPolyline((route));
+            polyline.setClickable(true);
+            polyline.setTag(durations.get(i));
+            polyline.setZIndex(0);
+            mRoutes.add(polyline);
+            List<LatLng> points = route.getPoints();
+            for (LatLng point : points) {
+                builder.include(point);
+            }
+            if (i == polylineOptions.size() - 1) {
+                polyline.setWidth(SELECTED_ROUTE_WIDTH);
+                directionFragment.onDurationChange(durations.get(i), polyline.getColor());
+            }
+        }
+
+        LatLngBounds bounds = builder.build();
+        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 0), 1000, null);
+
+        BitmapDrawable bitmapDrawable = (BitmapDrawable) ResourcesCompat.getDrawable(getResources(), R.drawable.marker_point,
+                context.getTheme());
+        Bitmap bmp = Bitmap.createScaledBitmap(bitmapDrawable.getBitmap(), 36, 36, false);
+        BitmapDescriptor descriptor = BitmapDescriptorFactory.fromBitmap(bmp);
+        if (mRouteStartMarker != null)
+            mRouteStartMarker.remove();
+        if (mRouteEndMarker != null)
+            mRouteEndMarker.remove();
+
+        mRouteStartMarker = mMap.addMarker(new MarkerOptions()
+                .position(polylineOptions.get(0).getPoints().get(0))
+                .icon(descriptor).anchor(0.5f, 0.5f));
+        mRouteEndMarker = mMap.addMarker(new MarkerOptions()
+                .position(polylineOptions.get(0).getPoints().get(polylineOptions.get(0).getPoints().size() - 1))
+                .icon(descriptor).anchor(0.5f, 0.5f));
+    }
+
+    public void showDirectionFragment(LatLng origin, LatLng dest) {
+        directionFragment = DirectionFragment.newInstance(origin, dest);
+
+        FragmentManager manager = getChildFragmentManager();
+        FragmentTransaction transaction = manager.beginTransaction();
+        transaction.replace(R.id.frameTop, directionFragment);
+        transaction.addToBackStack(null);
+        transaction.commit();
+    }
+
+    @Override
+    public void closeDirection() {
+        getChildFragmentManager().popBackStack();
+
+        if (mRoutes != null) {
+            for (int i = 0; i < mRoutes.size(); i++) {
+                mRoutes.get(i).remove();
+            }
+        }
+
+        if (mRouteStartMarker != null)
+            mRouteStartMarker.remove();
+        if (mRouteEndMarker != null)
+            mRouteEndMarker.remove();
+
+        directionFragment = null;
+        Fragment fm = getFragmentManager().findFragmentById(R.id.frameRouteInfo);
+        if (fm != null && fm.isAdded())
+            main.getSupportFragmentManager().beginTransaction().remove(fm).commit();
     }
 }
