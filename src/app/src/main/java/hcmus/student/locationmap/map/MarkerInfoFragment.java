@@ -78,10 +78,11 @@ public class MarkerInfoFragment extends Fragment implements View.OnClickListener
     public void onClick(View v) {
         switch (v.getId()) {
             case R.id.btnDirection:
-                //execute direction
+                activity.drawRoute(null, latLng, "driving");
+                activity.backToPreviousFragment();
                 break;
             case R.id.btnAdd:
-                //Open add contact
+
                 break;
             case R.id.btnClose:
                 activity.backToPreviousFragment();

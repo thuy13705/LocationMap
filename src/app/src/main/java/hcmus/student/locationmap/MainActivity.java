@@ -1,29 +1,36 @@
 package hcmus.student.locationmap;
 
 import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.viewpager2.widget.ViewPager2;
 
+import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.material.tabs.TabLayout;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import hcmus.student.locationmap.map.MapsFragment;
 import hcmus.student.locationmap.map.MarkerInfoFragment;
 import hcmus.student.locationmap.utilities.LocationService;
 import hcmus.student.locationmap.utilities.LocationChangeCallback;
@@ -157,6 +164,15 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
     }
 
     @Override
+    public void onBackPressed() {
+        if (mViewPager.getCurrentItem() == 0 && adapter.getFragment(0).getChildFragmentManager().getBackStackEntryCount() > 0) {
+            ((MapsFragment) adapter.getFragment(0)).closeDirection();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
     public void registerLocationChange(LocationChangeCallback delegate) {
         delegates.add(delegate);
     }
@@ -175,5 +191,22 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
         fragmentTransaction.addToBackStack(null);
         fragmentTransaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
         fragmentTransaction.commit();
+    }
+
+    @Override
+    public void openSearchResultMarker(LatLng latLng) {
+        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
+        InputMethodManager imm = (InputMethodManager) this.getSystemService(Activity.INPUT_METHOD_SERVICE);
+        View view = this.getCurrentFocus();
+        if (view == null) {
+            view = new View(this);
+        }
+        imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        fragment.openSearchResultMarker(latLng);
+    }
+
+    public void drawRoute(LatLng start, LatLng end, String mode) {
+        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
+        fragment.drawRoute(start, end, mode);
     }
 }
