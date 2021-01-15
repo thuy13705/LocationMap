@@ -24,11 +24,11 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import java.util.ArrayList;
 import java.util.List;
 
+import hcmus.student.locationmap.utilities.AddressChangeCallback;
 import hcmus.student.locationmap.MainActivity;
 import hcmus.student.locationmap.R;
 import hcmus.student.locationmap.model.Database;
 import hcmus.student.locationmap.model.Place;
-import hcmus.student.locationmap.utilities.AddressChangeCallback;
 import hcmus.student.locationmap.utilities.AddressLine;
 import hcmus.student.locationmap.utilities.AddressProvider;
 import hcmus.student.locationmap.utilities.OnAddressLineResponse;

@@ -43,7 +43,7 @@ import hcmus.student.locationmap.utilities.OnLocationChange;
 import hcmus.student.locationmap.utilities.ViewPagerAdapter;
 
 
-public abstract class MainActivity extends FragmentActivity implements MainCallbacks, OnLocationChange, OnAddressChange {
+public class MainActivity extends FragmentActivity implements MainCallbacks, OnLocationChange, AddressChangeCallback {
     private static final int LOCATION_STATUS_CODE = 1;
     private ViewPager2 mViewPager;
     private ViewPagerAdapter adapter;
@@ -279,10 +279,5 @@ public abstract class MainActivity extends FragmentActivity implements MainCallb
         for (AddressChangeCallback delegate : addressDelegates) {
             delegate.onAddressDelete(placeId);
         }
-    }
-
-    @Override
-    public void onPointerCaptureChanged(boolean hasCapture) {
-
     }
 }

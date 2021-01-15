@@ -2,6 +2,8 @@ package hcmus.student.locationmap.map;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.os.Build;
@@ -55,9 +57,10 @@ import hcmus.student.locationmap.map.utilities.direction.DirectionTask;
 import hcmus.student.locationmap.model.Place;
 import hcmus.student.locationmap.utilities.AddressChangeCallback;
 import hcmus.student.locationmap.utilities.AddressProvider;
+import hcmus.student.locationmap.utilities.Storage;
 
 public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback,
-        MapsFragmentCallback, DirectionResponse {
+        MapsFragmentCallback, DirectionResponse, AddressChangeCallback {
 
     private static final int DEFAULT_ZOOM = 15;
     private static final int NORMAL_ROUTE_WIDTH = 8;
@@ -106,6 +109,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         velocityRunnable = null;
         speedMonitor = new SpeedMonitor(context);
 
+        mContactMarkers = new ArrayList<>();
         mRouteStartMarker = mRouteEndMarker = null;
         mAddressProvider = main.getAddressProvider();
         isContactShown = false;
@@ -449,5 +453,61 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         Fragment fm = getFragmentManager().findFragmentById(R.id.frameRouteInfo);
         if (fm != null && fm.isAdded())
             main.getSupportFragmentManager().beginTransaction().remove(fm).commit();
+    }
+
+    private Marker createMarker(int id, LatLng location, String avatar) {
+        if (mDefaultMarker != null && compareLatLng(mDefaultMarker.getPosition(), location)) {
+            mDefaultMarker.remove();
+            mDefaultMarker = null;
+        }
+
+        Bitmap bmpMarker = BitmapFactory.decodeResource(getResources(), R.drawable.marker_frame).copy(Bitmap.Config.ARGB_8888, true);
+        bmpMarker = Bitmap.createScaledBitmap(bmpMarker, 100, 110, false);
+        if (avatar != null) {
+            Storage storage = new Storage(context);
+            Bitmap bmpAvatar = storage.readImageFromInternalStorage(avatar);
+            bmpAvatar = Bitmap.createScaledBitmap(bmpAvatar, 90, 90, false);
+            Canvas canvas = new Canvas(bmpMarker);
+            canvas.drawBitmap(bmpAvatar, 5, 5, null);
+        }
+
+        Marker newMarker = mMap.addMarker(new MarkerOptions().position(location)
+                .icon(BitmapDescriptorFactory.fromBitmap(bmpMarker)));
+        newMarker.setZIndex(3);
+        newMarker.setTag(id);
+        return newMarker;
+    }
+
+    private void updateContactMarkers() {
+        mContactMarkers.clear();
+        for (Place place : mAddressProvider.getPlaces()) {
+            Marker newMarker = createMarker(place.getId(), place.getLocation(), place.getAvatar());
+            newMarker.setVisible(isContactShown);
+            mContactMarkers.add(newMarker);
+        }
+    }
+
+    @Override
+    public void onAddressInsert(Place place) {
+        mContactMarkers.add(createMarker(place.getId(), place.getLocation(), place.getAvatar()));
+    }
+
+    @Override
+    public void onAddressUpdate(Place place) {
+        for (Marker marker : mContactMarkers) {
+            marker.remove();
+        }
+        updateContactMarkers();
+    }
+
+    @Override
+    public void onAddressDelete(int placeId) {
+        for (Marker marker : mContactMarkers) {
+            if ((int) marker.getTag() == placeId) {
+                marker.remove();
+                mContactMarkers.remove(marker);
+                break;
+            }
+        }
     }
 }

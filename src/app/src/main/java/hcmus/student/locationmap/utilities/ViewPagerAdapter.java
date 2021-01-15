@@ -10,6 +10,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter;
 
 import java.util.ArrayList;
 
+import hcmus.student.locationmap.address_book.AddressBookFragment;
 import hcmus.student.locationmap.map.MapsFragment;
 
 public class ViewPagerAdapter extends FragmentStateAdapter {
@@ -21,6 +22,7 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
         super(fragmentActivity);
         fragmentList = new ArrayList<>();
         fragmentList.add(MapsFragment.newInstance());
+        fragmentList.add(AddressBookFragment.newInstance());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
