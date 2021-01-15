@@ -23,8 +23,8 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
         super(fragmentActivity);
         fragmentList = new ArrayList<>();
         fragmentList.add(MapsFragment.newInstance());
-        fragmentList.add(AddressBookFragment.newInstance());
         fragmentList.add(WeatherFragment.newInstance());
+        fragmentList.add(AddressBookFragment.newInstance());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
