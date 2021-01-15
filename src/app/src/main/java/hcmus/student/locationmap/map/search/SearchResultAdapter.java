@@ -25,6 +25,7 @@ import hcmus.student.locationmap.map.utilities.place.PlaceRespondCallback;
 import hcmus.student.locationmap.map.utilities.place.PlaceSearch;
 import hcmus.student.locationmap.model.Database;
 import hcmus.student.locationmap.model.Place;
+import hcmus.student.locationmap.utilities.Storage;
 
 public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapter.ViewHolder> implements PlaceRespondCallback {
     final static int DELAY_TYPING = 200;
@@ -107,35 +108,6 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
         return position;
     }
 
-//    @Override
-//    public View getView(int position, View convertView, ViewGroup parent) {
-//        if (convertView == null) {
-//            LayoutInflater inflater = ((Activity) context).getLayoutInflater();
-//            convertView = inflater.inflate(R.layout.row_search_result, null, false);
-//        }
-//        ImageView ivAvatar = convertView.findViewById(R.id.ivAvatar);
-//        TextView txtPlaceName = convertView.findViewById(R.id.txtPlaceName);
-//
-//        final Place place = places.get(position);
-//        if (place.getAvatar() != null) {
-//            Bitmap bmp = BitmapFactory.decodeByteArray(place.getAvatar(), 0, place.getAvatar().length);
-//            ivAvatar.setBackground(new BitmapDrawable(context.getResources(), bmp));
-//            ivAvatar.setImageBitmap(bmp);
-//        }
-//        txtPlaceName.setText(place.getName());
-//
-//        convertView.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                ((MainActivity) context).openSearchResultMarker(place.getLocation());
-//                places = new ArrayList<>();
-//                notifyDataSetChanged();
-//                if (delegate != null)
-//                    delegate.onSearchClickCallback(place);
-//            }
-//        });
-//        return convertView;
-//    }
 
     @NonNull
     @Override
@@ -147,10 +119,9 @@ public class SearchResultAdapter extends RecyclerView.Adapter<SearchResultAdapte
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         final Place place = places.get(position);
+        Storage storage = new Storage(context);
         if (place.getAvatar() != null) {
-            Bitmap bmp = BitmapFactory.decodeByteArray(place.getAvatar(), 0, place.getAvatar().length);
-            holder.ivAvatar.setBackground(new BitmapDrawable(context.getResources(), bmp));
-            holder.ivAvatar.setImageBitmap(bmp);
+            holder.ivAvatar.setImageBitmap(storage.readImageFromInternalStorage(place.getAvatar()));
         }
         holder.txtPlaceName.setText(place.getName());
 

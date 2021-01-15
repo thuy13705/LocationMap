@@ -1,4 +1,4 @@
-package hcmus.student.locationmap.utilities;
+package hcmus.student.locationmap.map.utilities;
 
 import android.location.Location;
 

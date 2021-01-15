@@ -2,6 +2,8 @@ package hcmus.student.locationmap.map;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Location;
 import android.os.Build;
@@ -28,6 +30,7 @@ import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
@@ -46,18 +49,23 @@ import hcmus.student.locationmap.R;
 import hcmus.student.locationmap.map.custom_view.MapWrapper;
 import hcmus.student.locationmap.map.custom_view.OnMapWrapperTouch;
 import hcmus.student.locationmap.map.direction.DirectionFragment;
+import hcmus.student.locationmap.map.utilities.LocationChangeCallback;
 import hcmus.student.locationmap.map.utilities.SpeedMonitor;
 import hcmus.student.locationmap.map.utilities.direction.Direction;
 import hcmus.student.locationmap.map.utilities.direction.DirectionResponse;
 import hcmus.student.locationmap.map.utilities.direction.DirectionTask;
-import hcmus.student.locationmap.utilities.LocationChangeCallback;
+import hcmus.student.locationmap.model.Place;
+import hcmus.student.locationmap.utilities.AddressChangeCallback;
+import hcmus.student.locationmap.utilities.AddressProvider;
+import hcmus.student.locationmap.utilities.Storage;
 
 public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback,
-        MapsFragmentCallback, DirectionResponse {
+        MapsFragmentCallback, DirectionResponse, AddressChangeCallback {
 
     private static final int DEFAULT_ZOOM = 15;
     private static final int NORMAL_ROUTE_WIDTH = 8;
     private static final int SELECTED_ROUTE_WIDTH = 12;
+    private static final double THRESHOLD = 1e-6;
 
     private MainActivity main;
     private Context context;
@@ -65,14 +73,16 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     private GoogleMap mMap;
     private Location mCurrentLocation;
     private Marker mLocationIndicator;
+    private AddressProvider mAddressProvider;
     private Marker mDefaultMarker;
     private MapView mMapView;
     private MarkerAnimator animator;
     private boolean isCameraFollowing;
     private boolean isContactShown;
+    private List<Marker> mContactMarkers;
     private SpeedMonitor speedMonitor;
     private FloatingActionButton btnLocation;
-    private TextView txtSpeed;
+    private FloatingActionButton btnContact;    private TextView txtSpeed;
     private Handler velocityHandler;
     private Runnable velocityRunnable;
     private DirectionFragment directionFragment;
@@ -99,7 +109,11 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         velocityRunnable = null;
         speedMonitor = new SpeedMonitor(context);
 
+        mContactMarkers = new ArrayList<>();
         mRouteStartMarker = mRouteEndMarker = null;
+        mAddressProvider = main.getAddressProvider();
+        isContactShown = false;
+
     }
 
     @Nullable
@@ -112,7 +126,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         txtSpeed = view.findViewById(R.id.txtSpeed);
 
         mMapView.onCreate(savedInstanceState);
+
         main.registerLocationChange(this);
+        main.registerAddressChange((AddressChangeCallback) this);
         mMapView.getMapAsync(this);
         return view;
     }
@@ -120,7 +136,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-
+        btnContact = getView().findViewById(R.id.btnContact);
         btnLocation = getView().findViewById(R.id.btnLocation);
         final MapWrapper mapContainer = getView().findViewById(R.id.mapContainer);
 
@@ -218,7 +234,47 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
                 directionFragment.onDurationChange(polyline.getTag().toString(), polyline.getColor());
             }
         });
+        btnContact.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (isContactShown) {
+                    hideAllAddress();
+                    btnContact.clearColorFilter();
+                    isContactShown = false;
+                } else {
+                    showAllAddress();
+                    int color = getResources().getColor(R.color.colorPrimary);
+                    btnContact.setColorFilter(color);
+                    isContactShown = true;
+                }
+            }
+        });
+    }
+    private void hideAllAddress() {
+        for (Marker marker : mContactMarkers) {
+            marker.setVisible(false);
+        }
+    }
 
+    @Override
+    public void moveCamera(LatLng location) {
+        stopFollowing();
+        LatLng markerLoc = new LatLng(location.latitude, location.longitude);
+        final CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(markerLoc).zoom(15).tilt(30).build();
+        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        for (Place place : mAddressProvider.getPlaces()) {
+            if (compareLatLng(place.getLocation(), location)) {
+                showAllAddress();
+                isContactShown = true;
+                break;
+            }
+        }
+    }
+
+
+    private boolean compareLatLng(LatLng latLng1, LatLng latLng2) {
+        return Math.abs(latLng1.latitude - latLng2.latitude) < THRESHOLD && Math.abs(latLng1.longitude - latLng2.longitude) < THRESHOLD;
     }
 
     @Override
@@ -262,6 +318,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
 
         velocityHandler.postDelayed(velocityRunnable, 5000);
         animator.animate(location, isCameraFollowing);
+    }
+
+    private void showAllAddress() {
+        for (Marker marker : mContactMarkers) {
+            marker.setVisible(true);
+        }
     }
 
     public void stopFollowing() {
@@ -391,5 +453,61 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         Fragment fm = getFragmentManager().findFragmentById(R.id.frameRouteInfo);
         if (fm != null && fm.isAdded())
             main.getSupportFragmentManager().beginTransaction().remove(fm).commit();
+    }
+
+    private Marker createMarker(int id, LatLng location, String avatar) {
+        if (mDefaultMarker != null && compareLatLng(mDefaultMarker.getPosition(), location)) {
+            mDefaultMarker.remove();
+            mDefaultMarker = null;
+        }
+
+        Bitmap bmpMarker = BitmapFactory.decodeResource(getResources(), R.drawable.marker_frame).copy(Bitmap.Config.ARGB_8888, true);
+        bmpMarker = Bitmap.createScaledBitmap(bmpMarker, 100, 110, false);
+        if (avatar != null) {
+            Storage storage = new Storage(context);
+            Bitmap bmpAvatar = storage.readImageFromInternalStorage(avatar);
+            bmpAvatar = Bitmap.createScaledBitmap(bmpAvatar, 90, 90, false);
+            Canvas canvas = new Canvas(bmpMarker);
+            canvas.drawBitmap(bmpAvatar, 5, 5, null);
+        }
+
+        Marker newMarker = mMap.addMarker(new MarkerOptions().position(location)
+                .icon(BitmapDescriptorFactory.fromBitmap(bmpMarker)));
+        newMarker.setZIndex(3);
+        newMarker.setTag(id);
+        return newMarker;
+    }
+
+    private void updateContactMarkers() {
+        mContactMarkers.clear();
+        for (Place place : mAddressProvider.getPlaces()) {
+            Marker newMarker = createMarker(place.getId(), place.getLocation(), place.getAvatar());
+            newMarker.setVisible(isContactShown);
+            mContactMarkers.add(newMarker);
+        }
+    }
+
+    @Override
+    public void onAddressInsert(Place place) {
+        mContactMarkers.add(createMarker(place.getId(), place.getLocation(), place.getAvatar()));
+    }
+
+    @Override
+    public void onAddressUpdate(Place place) {
+        for (Marker marker : mContactMarkers) {
+            marker.remove();
+        }
+        updateContactMarkers();
+    }
+
+    @Override
+    public void onAddressDelete(int placeId) {
+        for (Marker marker : mContactMarkers) {
+            if ((int) marker.getTag() == placeId) {
+                marker.remove();
+                mContactMarkers.remove(marker);
+                break;
+            }
+        }
     }
 }

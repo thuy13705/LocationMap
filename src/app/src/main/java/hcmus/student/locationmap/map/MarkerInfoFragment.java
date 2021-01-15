@@ -82,7 +82,7 @@ public class MarkerInfoFragment extends Fragment implements View.OnClickListener
                 activity.backToPreviousFragment();
                 break;
             case R.id.btnAdd:
-
+                activity.openAddContact(latLng);
                 break;
             case R.id.btnClose:
                 activity.backToPreviousFragment();
