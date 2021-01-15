@@ -1,15 +1,14 @@
 package hcmus.student.locationmap.utilities;
 
 import android.content.Context;
-import android.util.Log;
 
 import com.google.android.gms.maps.model.LatLng;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import hcmus.student.locationmap.model.Database;
 import hcmus.student.locationmap.model.Place;
+
 
 public class AddressProvider {
     private Database mDatabase;
@@ -27,7 +26,7 @@ public class AddressProvider {
         return places;
     }
 
-    public void insertPlace(String name, LatLng location, byte[] avatar) {
+    public void insertPlace(String name, LatLng location, String avatar) {
         mDatabase.insertPlace(name, location, avatar);
         Place newPlace = mDatabase.searchForPlaces(name).get(0);
         places = mDatabase.getAllPlaces();
@@ -56,4 +55,3 @@ public class AddressProvider {
         places = mDatabase.getAllPlaces();
     }
 }
-

@@ -16,7 +16,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -26,25 +25,36 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.material.tabs.TabLayout;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import hcmus.student.locationmap.address_book.EditPlaceFragment;
+import hcmus.student.locationmap.map.AddContactFragment;
 import hcmus.student.locationmap.map.MapsFragment;
 import hcmus.student.locationmap.map.MarkerInfoFragment;
+import hcmus.student.locationmap.map.utilities.LocationChangeCallback;
+import hcmus.student.locationmap.model.Place;
+import hcmus.student.locationmap.utilities.AddressChangeCallback;
+import hcmus.student.locationmap.utilities.AddressProvider;
 import hcmus.student.locationmap.utilities.LocationService;
-import hcmus.student.locationmap.utilities.LocationChangeCallback;
+import hcmus.student.locationmap.MainCallbacks;
+import hcmus.student.locationmap.utilities.OnAddressChange;
+import hcmus.student.locationmap.utilities.OnLocationChange;
 import hcmus.student.locationmap.utilities.ViewPagerAdapter;
 
 
-public class MainActivity extends FragmentActivity implements MainCallbacks, LocationChangeCallback {
+public abstract class MainActivity extends FragmentActivity implements MainCallbacks, OnLocationChange, OnAddressChange {
     private static final int LOCATION_STATUS_CODE = 1;
     private ViewPager2 mViewPager;
     private ViewPagerAdapter adapter;
     private Location mCurrentLocation;
     private LocationService service;
     private List<LocationChangeCallback> delegates;
+    private AddressProvider addressProvider;
+    private List<AddressChangeCallback> addressDelegates;
 
+    private boolean isGettingLocation = true;
+    private View mProgressBar;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
@@ -52,6 +62,7 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mProgressBar = findViewById(R.id.loadingScreen);
         final TabLayout mTabs = findViewById(R.id.tabs);
 
         mViewPager = findViewById(R.id.pager);
@@ -83,6 +94,8 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
 
         service = new LocationService(this, this);
         delegates = new ArrayList<>();
+        addressProvider = new AddressProvider(this, this);
+        addressDelegates = new ArrayList<>();
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
@@ -157,20 +170,41 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
         return mCurrentLocation;
     }
 
-    @Override
-    public void onLocationChange(Location location) {
-        mCurrentLocation = location;
-        notifyLocationChange();
+    public void backToPreviousFragment() {
+        getSupportFragmentManager().popBackStack();
+    }
+
+    public void openMarkerInfo(Marker marker) {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        fragmentTransaction.setCustomAnimations(R.anim.slide_in_left, R.anim.slide_out_right);
+        fragmentTransaction.replace(R.id.frameBottom, MarkerInfoFragment.newInstance(marker));
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
+        fragmentTransaction.commit();
+    }
+
+    public void drawRoute(LatLng start, LatLng end, String mode) {
+        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
+        fragment.drawRoute(start, end, mode);
     }
 
     @Override
-    public void onBackPressed() {
-        if (mViewPager.getCurrentItem() == 0 && adapter.getFragment(0).getChildFragmentManager().getBackStackEntryCount() > 0) {
-            ((MapsFragment) adapter.getFragment(0)).closeDirection();
-        } else {
-            super.onBackPressed();
-        }
+    public void locatePlace(LatLng location) {
+        mViewPager.setCurrentItem(0);
+        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
+        fragment.moveCamera(location);
+        TabLayout mTabs = findViewById(R.id.tabs);
+        TabLayout.Tab tab = mTabs.getTabAt(0);
+        assert tab != null;
+        tab.select();
     }
+
+    @Override
+    public void editPlaces(Place place) {
+        EditPlaceFragment.newInstance(place).show(getSupportFragmentManager(), null);
+    }
+
 
     @Override
     public void registerLocationChange(LocationChangeCallback delegate) {
@@ -178,19 +212,8 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
     }
 
     @Override
-    public void backToPreviousFragment() {
-        getSupportFragmentManager().popBackStack();
-    }
-
-    @Override
-    public void openMarkerInfo(Marker marker) {
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-        //set fragment entrance animation
-        fragmentTransaction.replace(R.id.frameBottom, MarkerInfoFragment.newInstance(marker));
-        fragmentTransaction.addToBackStack(null);
-        fragmentTransaction.setTransition(FragmentTransaction.TRANSIT_FRAGMENT_OPEN);
-        fragmentTransaction.commit();
+    public void registerAddressChange(AddressChangeCallback delegate) {
+        addressDelegates.add(delegate);
     }
 
     @Override
@@ -205,8 +228,61 @@ public class MainActivity extends FragmentActivity implements MainCallbacks, Loc
         fragment.openSearchResultMarker(latLng);
     }
 
-    public void drawRoute(LatLng start, LatLng end, String mode) {
-        MapsFragment fragment = (MapsFragment) adapter.getFragment(0);
-        fragment.drawRoute(start, end, mode);
+    @Override
+    public void openAddContact(LatLng latLng) {
+        FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
+        fragmentTransaction.replace(R.id.frameBottom, AddContactFragment.newInstance(latLng));
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (mViewPager.getCurrentItem() == 0 && adapter.getFragment(0).getChildFragmentManager().getBackStackEntryCount() > 0) {
+            ((MapsFragment) adapter.getFragment(0)).closeDirection();
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    @Override
+    public void onLocationChange(Location location) {
+        if (isGettingLocation) {
+            mProgressBar.setVisibility(View.GONE);
+            isGettingLocation = false;
+        }
+        mCurrentLocation = location;
+        notifyLocationChange();
+    }
+
+    @Override
+    public AddressProvider getAddressProvider() {
+        return addressProvider;
+    }
+
+    @Override
+    public void onAddressInsert(Place place) {
+        for (AddressChangeCallback delegate : addressDelegates) {
+            delegate.onAddressInsert(place);
+        }
+    }
+
+    @Override
+    public void onAddressUpdate(Place place) {
+        for (AddressChangeCallback delegate : addressDelegates) {
+            delegate.onAddressUpdate(place);
+        }
+    }
+
+    @Override
+    public void onAddressDelete(int placeId) {
+        for (AddressChangeCallback delegate : addressDelegates) {
+            delegate.onAddressDelete(placeId);
+        }
+    }
+
+    @Override
+    public void onPointerCaptureChanged(boolean hasCapture) {
+
     }
 }

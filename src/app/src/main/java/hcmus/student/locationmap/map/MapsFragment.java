@@ -28,6 +28,7 @@ import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.model.BitmapDescriptor;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
@@ -46,11 +47,14 @@ import hcmus.student.locationmap.R;
 import hcmus.student.locationmap.map.custom_view.MapWrapper;
 import hcmus.student.locationmap.map.custom_view.OnMapWrapperTouch;
 import hcmus.student.locationmap.map.direction.DirectionFragment;
+import hcmus.student.locationmap.map.utilities.LocationChangeCallback;
 import hcmus.student.locationmap.map.utilities.SpeedMonitor;
 import hcmus.student.locationmap.map.utilities.direction.Direction;
 import hcmus.student.locationmap.map.utilities.direction.DirectionResponse;
 import hcmus.student.locationmap.map.utilities.direction.DirectionTask;
-import hcmus.student.locationmap.utilities.LocationChangeCallback;
+import hcmus.student.locationmap.model.Place;
+import hcmus.student.locationmap.utilities.AddressChangeCallback;
+import hcmus.student.locationmap.utilities.AddressProvider;
 
 public class MapsFragment extends Fragment implements OnMapReadyCallback, LocationChangeCallback,
         MapsFragmentCallback, DirectionResponse {
@@ -58,6 +62,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     private static final int DEFAULT_ZOOM = 15;
     private static final int NORMAL_ROUTE_WIDTH = 8;
     private static final int SELECTED_ROUTE_WIDTH = 12;
+    private static final double THRESHOLD = 1e-6;
 
     private MainActivity main;
     private Context context;
@@ -65,14 +70,16 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     private GoogleMap mMap;
     private Location mCurrentLocation;
     private Marker mLocationIndicator;
+    private AddressProvider mAddressProvider;
     private Marker mDefaultMarker;
     private MapView mMapView;
     private MarkerAnimator animator;
     private boolean isCameraFollowing;
     private boolean isContactShown;
+    private List<Marker> mContactMarkers;
     private SpeedMonitor speedMonitor;
     private FloatingActionButton btnLocation;
-    private TextView txtSpeed;
+    private FloatingActionButton btnContact;    private TextView txtSpeed;
     private Handler velocityHandler;
     private Runnable velocityRunnable;
     private DirectionFragment directionFragment;
@@ -100,6 +107,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         speedMonitor = new SpeedMonitor(context);
 
         mRouteStartMarker = mRouteEndMarker = null;
+        mAddressProvider = main.getAddressProvider();
+        isContactShown = false;
+
     }
 
     @Nullable
@@ -112,7 +122,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
         txtSpeed = view.findViewById(R.id.txtSpeed);
 
         mMapView.onCreate(savedInstanceState);
+
         main.registerLocationChange(this);
+        main.registerAddressChange((AddressChangeCallback) this);
         mMapView.getMapAsync(this);
         return view;
     }
@@ -120,7 +132,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-
+        btnContact = getView().findViewById(R.id.btnContact);
         btnLocation = getView().findViewById(R.id.btnLocation);
         final MapWrapper mapContainer = getView().findViewById(R.id.mapContainer);
 
@@ -218,7 +230,47 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
                 directionFragment.onDurationChange(polyline.getTag().toString(), polyline.getColor());
             }
         });
+        btnContact.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (isContactShown) {
+                    hideAllAddress();
+                    btnContact.clearColorFilter();
+                    isContactShown = false;
+                } else {
+                    showAllAddress();
+                    int color = getResources().getColor(R.color.colorPrimary);
+                    btnContact.setColorFilter(color);
+                    isContactShown = true;
+                }
+            }
+        });
+    }
+    private void hideAllAddress() {
+        for (Marker marker : mContactMarkers) {
+            marker.setVisible(false);
+        }
+    }
 
+    @Override
+    public void moveCamera(LatLng location) {
+        stopFollowing();
+        LatLng markerLoc = new LatLng(location.latitude, location.longitude);
+        final CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(markerLoc).zoom(15).tilt(30).build();
+        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+        for (Place place : mAddressProvider.getPlaces()) {
+            if (compareLatLng(place.getLocation(), location)) {
+                showAllAddress();
+                isContactShown = true;
+                break;
+            }
+        }
+    }
+
+
+    private boolean compareLatLng(LatLng latLng1, LatLng latLng2) {
+        return Math.abs(latLng1.latitude - latLng2.latitude) < THRESHOLD && Math.abs(latLng1.longitude - latLng2.longitude) < THRESHOLD;
     }
 
     @Override
@@ -262,6 +314,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback, Locati
 
         velocityHandler.postDelayed(velocityRunnable, 5000);
         animator.animate(location, isCameraFollowing);
+    }
+
+    private void showAllAddress() {
+        for (Marker marker : mContactMarkers) {
+            marker.setVisible(true);
+        }
     }
 
     public void stopFollowing() {

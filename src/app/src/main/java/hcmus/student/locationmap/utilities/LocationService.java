@@ -24,6 +24,9 @@ import com.google.android.gms.tasks.Task;
 
 import java.util.Collections;
 
+import hcmus.student.locationmap.MainActivity;
+import hcmus.student.locationmap.map.utilities.LocationChangeCallback;
+
 public class LocationService {
     private static final long UPDATE_INTERVAL = 1000;
     private static final long FASTEST_UPDATE_INTERVAL = 1000;
@@ -31,9 +34,9 @@ public class LocationService {
 
     private Context context;
     private FusedLocationProviderClient mClient;
-    private LocationChangeCallback delegate;
+    private MainActivity delegate;
 
-    public LocationService(Context context, LocationChangeCallback delegate) {
+    public LocationService(Context context, MainActivity delegate) {
         this.context = context;
         this.mClient = LocationServices.getFusedLocationProviderClient(context);
         this.delegate = delegate;

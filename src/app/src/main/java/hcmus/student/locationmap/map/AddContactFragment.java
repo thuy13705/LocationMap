@@ -1,4 +1,4 @@
-package hcmus.student.locationmap.address_book;
+package hcmus.student.locationmap.map;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -9,10 +9,8 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,51 +22,38 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.gms.maps.model.LatLng;
 
-import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
 import hcmus.student.locationmap.MainActivity;
 import hcmus.student.locationmap.R;
-
-import hcmus.student.locationmap.model.Place;
 import hcmus.student.locationmap.utilities.AddressProvider;
 import hcmus.student.locationmap.utilities.Storage;
 
 import static android.app.Activity.RESULT_OK;
 
-public class EditPlaceFragment extends DialogFragment implements View.OnClickListener {
+public class AddContactFragment extends Fragment implements View.OnClickListener {
     MainActivity activity;
-    Button btnOK, btnCancel;
-    EditText edtNewName;
+    Button btnAdd, btnCancel;
+    EditText edtName;
     ImageButton btnCamera, btnFolder;
     ImageView ivAvatar;
-    Place place;
     LatLng latLng;
     Bitmap selectedImage;
     AddressProvider mAddressProvider;
     Storage storage;
-
     int REQUEST_CODE_CAMERA = 123;
     int REQUEST_CODE_FOLDER = 456;
 
-    public static EditPlaceFragment newInstance(Place place) {
-        EditPlaceFragment fragment = new EditPlaceFragment();
+    public static AddContactFragment newInstance(LatLng latLng) {
+        AddContactFragment fragment = new AddContactFragment();
         Bundle args = new Bundle();
-
-        args.putInt("id", place.getId());
-        args.putString("name", place.getName());
-        args.putDouble("lat", place.getLocation().latitude);
-        args.putDouble("lng", place.getLocation().latitude);
-        args.putString("avatar", place.getAvatar());
-        args.putString("favorite", place.getFavorite());
-
-        Log.d("name", place.getName());
+        args.putDouble("lat", latLng.latitude);
+        args.putDouble("lng", latLng.longitude);
         fragment.setArguments(args);
         return fragment;
     }
@@ -84,35 +69,24 @@ public class EditPlaceFragment extends DialogFragment implements View.OnClickLis
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.dialog_edit, container, false);
+        View view = inflater.inflate(R.layout.fragment_add_contact, container, false);
 
-        Bundle args = getArguments();
-
-
-        btnOK = view.findViewById(R.id.btnOK);
+        btnAdd = view.findViewById(R.id.btnAddContact);
         btnCancel = view.findViewById(R.id.btnCancel);
-        edtNewName = view.findViewById(R.id.edtNewName);
+        edtName = view.findViewById(R.id.edtName);
         btnCamera = view.findViewById(R.id.btnCamera);
         btnFolder = view.findViewById(R.id.btnGallery);
         ivAvatar = view.findViewById(R.id.ivAvatar);
 
-        latLng = new LatLng(args.getDouble("lat"), args.getDouble("lng"));
-
-        place = new Place(args.getInt("id"), args.getString("name"), latLng, args.getString("avatar"), args.getString("favorite"));
-
-        edtNewName.setText(place.getName());
-        Log.d("name", place.getName());
-        Log.d("id", "" + place.getId());
-
-        if (place.getAvatar() != null) {
-            ivAvatar.setBackground(new BitmapDrawable(view.getResources(), place.getAvatar()));
-        }
-
+        ivAvatar.setEnabled(false);
         btnCamera.setOnClickListener(this);
         btnFolder.setOnClickListener(this);
-        btnOK.setOnClickListener(this);
+        btnAdd.setOnClickListener(this);
         btnCancel.setOnClickListener(this);
 
+        Bundle args = getArguments();
+
+        latLng = new LatLng(args.getDouble("lat"), args.getDouble("lng"));
         return view;
     }
 
@@ -121,41 +95,37 @@ public class EditPlaceFragment extends DialogFragment implements View.OnClickLis
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btnCamera:
-                CameraIntent();
+                cameraIntent();
                 break;
             case R.id.btnGallery:
-                GalleryIntent();
+                galleryIntent();
                 break;
-            case R.id.btnOK:
-                if (edtNewName.getText().toString().length() == 0) {
+            case R.id.btnAddContact:
+                if (edtName.getText().toString().length() == 0) {
                     Toast.makeText(activity, "Place name is required!", Toast.LENGTH_SHORT).show();
                 } else {
                     try {
-                        //Database db = new Database(getContext());
-                        place.setName(edtNewName.getText().toString());
-                        if (selectedImage != null) {
-                            place.setAvatar(storage.saveToInternalStorage(selectedImage));
-                        }
-                        mAddressProvider.updatePlace(place);
-                        dismiss();
+                        mAddressProvider.insertPlace(edtName.getText().toString(), new LatLng(latLng.latitude, latLng.longitude),
+                                storage.saveToInternalStorage(selectedImage));
+                        activity.backToPreviousFragment();
                     } catch (Exception e) {
-                        Toast.makeText(activity, "Cannot edit this place", Toast.LENGTH_SHORT).show();
-                        dismiss();
+                        e.printStackTrace();
+                        Toast.makeText(activity, "This place is already in contact book", Toast.LENGTH_SHORT).show();
                     }
                 }
                 break;
             case R.id.btnCancel:
-                dismiss();
+                activity.backToPreviousFragment();
                 break;
         }
     }
 
-    private void CameraIntent() {
+    private  void cameraIntent(){
         Intent intent = new Intent("android.media.action.IMAGE_CAPTURE");
         startActivityForResult(intent, REQUEST_CODE_CAMERA);
     }
 
-    private void GalleryIntent() {
+    private void galleryIntent(){
         Intent intent1 = new Intent(Intent.ACTION_PICK);
         intent1.setType("image/*");
         startActivityForResult(intent1, REQUEST_CODE_FOLDER);
@@ -163,7 +133,7 @@ public class EditPlaceFragment extends DialogFragment implements View.OnClickLis
 
     private void setSelectedImage(Bitmap bitmap) {
         ivAvatar.setImageBitmap(bitmap);
-        selectedImage = bitmap;
+        this.selectedImage = bitmap;
     }
 
     @Override

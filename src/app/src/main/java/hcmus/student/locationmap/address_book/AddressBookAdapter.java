@@ -3,12 +3,9 @@ package hcmus.student.locationmap.address_book;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.location.Geocoder;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,6 +32,7 @@ import hcmus.student.locationmap.utilities.AddressChangeCallback;
 import hcmus.student.locationmap.utilities.AddressLine;
 import hcmus.student.locationmap.utilities.AddressProvider;
 import hcmus.student.locationmap.utilities.OnAddressLineResponse;
+import hcmus.student.locationmap.utilities.Storage;
 
 public class AddressBookAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> implements AddressChangeCallback {
     Context context;
@@ -176,6 +174,7 @@ public class AddressBookAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         final FloatingActionButton btnFavorite = holder.btnFavorite;
         final FloatingActionButton btnLocate = holder.btnLocate;
         final ImageButton btnMore = holder.btnMore;
+        final Storage storage = new Storage(context);
 
         txtName.setText(place.getName());
         txtAddressLine.setText(R.string.txt_loading_address_line);
@@ -194,8 +193,7 @@ public class AddressBookAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         addressLine.execute(location);
 
         if (place.getAvatar() != null) {
-            Bitmap bmp = BitmapFactory.decodeByteArray(place.getAvatar(), 0, place.getAvatar().length);
-            ivAvatar.setBackground(new BitmapDrawable(context.getResources(), bmp));
+            ivAvatar.setBackground(new BitmapDrawable(context.getResources(), storage.readImageFromInternalStorage(place.getAvatar())));
         } else {
             ivAvatar.setBackgroundResource(R.drawable.ic_image);
         }
