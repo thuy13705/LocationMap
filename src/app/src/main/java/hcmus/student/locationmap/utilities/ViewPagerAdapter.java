@@ -11,6 +11,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter;
 import java.util.ArrayList;
 
 import hcmus.student.locationmap.map.MapsFragment;
+import hcmus.student.locationmap.weather.WeatherFragment;
 
 public class ViewPagerAdapter extends FragmentStateAdapter {
 
@@ -21,6 +22,7 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
         super(fragmentActivity);
         fragmentList = new ArrayList<>();
         fragmentList.add(MapsFragment.newInstance());
+        fragmentList.add(WeatherFragment.newInstance());
     }
 
     @RequiresApi(api = Build.VERSION_CODES.M)
